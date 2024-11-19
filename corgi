@@ -60,4 +60,4 @@ def brute_force_password():
 if __name__ == "__main__":
     try:
         brute_force_password()
-    except Keyboard
+    except Keyboard:
