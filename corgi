@@ -51,7 +51,7 @@ def brute_force_password():
     found_start = False
 
     # Using ThreadPoolExecutor for parallel requests
-    with ThreadPoolExecutor(max_workers=290) as executor:  # Adjust the number of workers as needed
+    with ThreadPoolExecutor(max_workers=590) as executor:  # Adjust the number of workers as needed
         # Generate all combinations of 5 characters
         for combo in product(characters, repeat=5):
             password = ''.join(combo)
